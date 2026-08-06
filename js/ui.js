@@ -254,7 +254,7 @@ function renderCleanSlateBody(resItem) {
   if (resItem.type === 'note') {
     container.innerHTML = `<div class="clean-slate-rich-text">${renderMarkdownOrHtml(resItem.content)}</div>`;
   } else if (resItem.type === 'video') {
-    const embedUrl = parseYouTubeEmbedUrl(resItem.url, resItem.startTime);
+    const embedUrl = parseYouTubeEmbedUrl(resItem.url, resItem.startTimeSec || resItem.startTime);
     if (embedUrl) {
       container.innerHTML = `
         <div class="media-embed-video">
@@ -551,12 +551,19 @@ function getYouTubeVideoId(url) {
   return match ? match[1] : null;
 }
 
-function parseYouTubeEmbedUrl(url, startTime = 0) {
+function parseYouTubeEmbedUrl(url, startTimeSec = 0) {
   const id = getYouTubeVideoId(url);
   if (!id) return null;
-  const seconds = parseTimeToSeconds(startTime);
-  const startParam = seconds > 0 ? `&start=${seconds}` : '';
-  return `https://www.youtube.com/embed/${id}?autohide=1&modestbranding=1&rel=0&enablejsapi=1${startParam}`;
+  const seconds = parseTimeToSeconds(startTimeSec);
+  const params = new URLSearchParams({
+    rel: '0',
+    playsinline: '1',
+    modestbranding: '1'
+  });
+  if (seconds > 0) {
+    params.set('start', seconds.toString());
+  }
+  return `https://www.youtube.com/embed/${id}?${params.toString()}`;
 }
 
 function getYouTubeThumbnail(url) {
