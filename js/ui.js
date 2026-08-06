@@ -192,6 +192,61 @@ function renderMarkdownOrHtml(content) {
   return content;
 }
 
+function parseTimeToSeconds(input) {
+  if (!input) return 0;
+  if (typeof input === 'number') return input;
+  const str = input.toString().trim().toLowerCase();
+  if (!str) return 0;
+
+  // Format 1: 1h 25m 23s or 1h25m23s or 25m23s or 45s
+  let totalSec = 0;
+  const hMatch = str.match(/(\d+)\s*h/);
+  const mMatch = str.match(/(\d+)\s*m/);
+  const sMatch = str.match(/(\d+)\s*s/);
+  if (hMatch || mMatch || sMatch) {
+    if (hMatch) totalSec += parseInt(hMatch[1], 10) * 3600;
+    if (mMatch) totalSec += parseInt(mMatch[1], 10) * 60;
+    if (sMatch) totalSec += parseInt(sMatch[1], 10);
+    return totalSec;
+  }
+
+  // Format 2: 1:25:23 or 25:23
+  if (str.includes(':')) {
+    const parts = str.split(':').map(p => parseInt(p, 10) || 0);
+    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    if (parts.length === 2) return parts[0] * 60 + parts[1];
+  }
+
+  // Format 3: pure number (e.g. 5123)
+  const num = parseInt(str, 10);
+  return isNaN(num) ? 0 : num;
+}
+
+function dataUrlToBlob(dataUrl) {
+  try {
+    const arr = dataUrl.split(',');
+    const mime = arr[0].match(/:(.*?);/)[1];
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new Blob([u8arr], { type: mime });
+  } catch (err) {
+    return null;
+  }
+}
+
+function getSafeViewableUrl(url) {
+  if (!url) return '';
+  if (url.startsWith('data:')) {
+    const blob = dataUrlToBlob(url);
+    if (blob) return URL.createObjectURL(blob);
+  }
+  return url;
+}
+
 function renderCleanSlateBody(resItem) {
   const container = document.getElementById('clean-slate-body');
   if (!container) return;
@@ -199,7 +254,7 @@ function renderCleanSlateBody(resItem) {
   if (resItem.type === 'note') {
     container.innerHTML = `<div class="clean-slate-rich-text">${renderMarkdownOrHtml(resItem.content)}</div>`;
   } else if (resItem.type === 'video') {
-    const embedUrl = parseYouTubeEmbedUrl(resItem.url);
+    const embedUrl = parseYouTubeEmbedUrl(resItem.url, resItem.startTime);
     if (embedUrl) {
       container.innerHTML = `
         <div class="media-embed-video">
@@ -220,25 +275,26 @@ function renderCleanSlateBody(resItem) {
       `;
     }
   } else if (resItem.type === 'image') {
+    const safeUrl = getSafeViewableUrl(resItem.url);
     container.innerHTML = `
       <div class="media-embed-image">
-        <a href="${escapeHTML(resItem.url)}" target="_blank" rel="noopener">
+        <a href="${escapeHTML(safeUrl)}" target="_blank" rel="noopener">
           <img src="${escapeHTML(resItem.url)}" alt="${escapeHTML(resItem.title)}" onerror="this.src='https://placehold.co/600x400?text=Image+Load+Failed'" />
         </a>
       </div>
       ${resItem.content ? `<div class="clean-slate-rich-text" style="margin-top:16px">${renderMarkdownOrHtml(resItem.content)}</div>` : ''}
     `;
   } else if (resItem.type === 'pdf') {
-    const isDataUrl = resItem.url && resItem.url.startsWith('data:application/pdf');
+    const safeUrl = getSafeViewableUrl(resItem.url);
     container.innerHTML = `
       <div class="media-embed-card">
         <span class="card-icon">📄</span>
         <div class="card-details">
           <div class="card-title">${escapeHTML(resItem.title)}</div>
-          <a href="${escapeHTML(resItem.url)}" target="_blank" rel="noopener" class="card-url">${isDataUrl ? 'Download / View Attached PDF ↗' : escapeHTML(resItem.url) + ' ↗'}</a>
+          <a href="${escapeHTML(safeUrl)}" target="_blank" rel="noopener" class="card-url">Open / Download PDF Document ↗</a>
         </div>
       </div>
-      ${resItem.url ? `<object data="${escapeHTML(resItem.url)}" type="application/pdf" class="media-embed-pdf-object"><p>PDF preview not available. <a href="${escapeHTML(resItem.url)}" target="_blank">Click here to open/download PDF</a></p></object>` : ''}
+      ${resItem.url ? `<object data="${escapeHTML(safeUrl)}" type="application/pdf" class="media-embed-pdf-object"><iframe src="${escapeHTML(safeUrl)}" style="width:100%;height:100%;border:none"></iframe></object>` : ''}
       ${resItem.content ? `<div class="clean-slate-rich-text">${renderMarkdownOrHtml(resItem.content)}</div>` : ''}
     `;
   } else { // link
@@ -263,11 +319,22 @@ function showResourceEditor(resToEdit = null) {
   const heading = document.getElementById('editor-mode-heading');
   const titleInput = document.getElementById('res-title-input');
   const urlInput = document.getElementById('res-url-input');
+  const timeInput = document.getElementById('res-time-input');
   const editor = document.getElementById('notes-editor');
+
+  // Reset file upload info display
+  const fileDisplay = document.getElementById('file-name-display');
+  if (fileDisplay) {
+    fileDisplay.textContent = '';
+    fileDisplay.classList.add('hidden');
+  }
+  const fileInput = document.getElementById('res-file-input');
+  if (fileInput) fileInput.value = '';
 
   if (heading) heading.textContent = resToEdit ? 'Edit Content' : 'Add New Content';
   if (titleInput) titleInput.value = resToEdit ? resToEdit.title : '';
   if (urlInput) urlInput.value = resToEdit ? (resToEdit.url || '') : '';
+  if (timeInput) timeInput.value = resToEdit ? (resToEdit.startTime || '') : '';
   if (editor) editor.innerHTML = resToEdit ? (resToEdit.content || '') : '';
 
   // Set type
@@ -281,34 +348,44 @@ function setResourceType(type) {
   });
 
   const urlGroup = document.getElementById('res-url-group');
+  const timeGroup = document.getElementById('res-time-group');
   const noteGroup = document.getElementById('res-note-group');
   const urlLabel = document.getElementById('res-url-label');
   const urlInput = document.getElementById('res-url-input');
   const urlHint = document.getElementById('res-url-hint');
+  const fileOpt = document.getElementById('file-upload-option');
 
   if (type === 'note') {
     urlGroup?.classList.add('hidden');
+    timeGroup?.classList.add('hidden');
     noteGroup?.classList.remove('hidden');
   } else {
     urlGroup?.classList.remove('hidden');
     noteGroup?.classList.remove('hidden');
 
     if (type === 'video') {
+      timeGroup?.classList.remove('hidden');
+      if (fileOpt) fileOpt.classList.add('hidden');
       if (urlLabel) urlLabel.textContent = 'YouTube Video URL';
       if (urlInput) urlInput.placeholder = 'https://www.youtube.com/watch?v=...';
       if (urlHint) urlHint.textContent = 'Paste a YouTube video link to play it directly in the app';
-    } else if (type === 'image') {
-      if (urlLabel) urlLabel.textContent = 'Image URL';
-      if (urlInput) urlInput.placeholder = 'https://example.com/image.jpg';
-      if (urlHint) urlHint.textContent = 'Paste a direct link to an image file';
-    } else if (type === 'pdf') {
-      if (urlLabel) urlLabel.textContent = 'PDF / File URL';
-      if (urlInput) urlInput.placeholder = 'https://example.com/document.pdf';
-      if (urlHint) urlHint.textContent = 'Link to Google Drive PDF, OneDrive, or web PDF';
     } else {
-      if (urlLabel) urlLabel.textContent = 'Web Link';
-      if (urlInput) urlInput.placeholder = 'https://example.com';
-      if (urlHint) urlHint.textContent = 'Paste any web link or reference article';
+      timeGroup?.classList.add('hidden');
+      if (fileOpt) fileOpt.classList.remove('hidden');
+
+      if (type === 'image') {
+        if (urlLabel) urlLabel.textContent = 'Image URL or Upload File';
+        if (urlInput) urlInput.placeholder = 'https://example.com/image.jpg or click Browse Local File';
+        if (urlHint) urlHint.textContent = 'Paste an image URL or click Browse Local File';
+      } else if (type === 'pdf') {
+        if (urlLabel) urlLabel.textContent = 'PDF Document / Upload File';
+        if (urlInput) urlInput.placeholder = 'https://example.com/doc.pdf or click Browse Local File';
+        if (urlHint) urlHint.textContent = 'Paste a PDF link or click Browse Local File';
+      } else {
+        if (urlLabel) urlLabel.textContent = 'Web Link';
+        if (urlInput) urlInput.placeholder = 'https://example.com';
+        if (urlHint) urlHint.textContent = 'Paste any web link or reference article';
+      }
     }
   }
 }
@@ -317,10 +394,12 @@ function saveResourceItem() {
   if (!activeNotesTopicId) return;
   const titleInput = document.getElementById('res-title-input');
   const urlInput = document.getElementById('res-url-input');
+  const timeInput = document.getElementById('res-time-input');
   const editor = document.getElementById('notes-editor');
 
   const title = titleInput?.value.trim() || (currentResType === 'note' ? 'General Notes' : 'Resource Link');
   const url = urlInput?.value.trim() || '';
+  const startTime = timeInput?.value.trim() || '';
   const content = editor?.innerHTML || '';
 
   const st = userState[activeExam][activeNotesTopicId] || {};
@@ -329,7 +408,7 @@ function saveResourceItem() {
   if (editingResId) {
     const idx = st.resources.findIndex(r => r.id === editingResId);
     if (idx !== -1) {
-      st.resources[idx] = { ...st.resources[idx], title, type: currentResType, url, content };
+      st.resources[idx] = { ...st.resources[idx], title, type: currentResType, url, startTime, content };
     }
   } else {
     const newItem = {
@@ -337,6 +416,7 @@ function saveResourceItem() {
       title,
       type: currentResType,
       url,
+      startTime,
       content,
       createdAt: new Date().toISOString()
     };
@@ -448,9 +528,12 @@ function getYouTubeVideoId(url) {
   return match ? match[1] : null;
 }
 
-function parseYouTubeEmbedUrl(url) {
+function parseYouTubeEmbedUrl(url, startTime = 0) {
   const id = getYouTubeVideoId(url);
-  return id ? `https://www.youtube.com/embed/${id}` : null;
+  if (!id) return null;
+  const seconds = parseTimeToSeconds(startTime);
+  const startParam = seconds > 0 ? `&start=${seconds}` : '';
+  return `https://www.youtube.com/embed/${id}?autohide=1&modestbranding=1&rel=0&enablejsapi=1${startParam}`;
 }
 
 function getYouTubeThumbnail(url) {
