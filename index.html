@@ -266,52 +266,138 @@
     </div>
   </div>
 
-  <!-- Notes Modal — Rich Text Editor -->
+  <!-- Study Hub & Clean Slate Reader Modal -->
   <div id="notes-modal" class="notes-modal hidden">
     <div id="modal-backdrop" class="modal-backdrop"></div>
-    <div class="modal-content modal-notes-editor">
-      <div class="modal-header">
-        <h3 id="modal-topic-title">Topic Notes</h3>
-        <button id="modal-close" class="modal-close-btn">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
+    <div class="modal-content hub-modal-content">
+      
+      <!-- Modal Top Bar -->
+      <div class="modal-header hub-modal-header">
+        <div class="hub-header-titles">
+          <span id="hub-breadcrumb" class="hub-breadcrumb">Exam > Subject</span>
+          <h3 id="modal-topic-title" class="hub-topic-title">Topic Content Hub</h3>
+        </div>
+        <div class="hub-header-actions">
+          <button id="btn-add-resource" class="btn-primary-sm">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add Content
+          </button>
+          <button id="modal-close" class="modal-close-btn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
       </div>
-      <!-- Formatting Toolbar -->
-      <div class="notes-toolbar">
-        <button class="toolbar-btn" data-cmd="bold" title="Bold (Ctrl+B)"><strong>B</strong></button>
-        <button class="toolbar-btn" data-cmd="italic" title="Italic (Ctrl+I)"><em>I</em></button>
-        <button class="toolbar-btn" data-cmd="underline" title="Underline (Ctrl+U)"><u>U</u></button>
-        <span class="toolbar-sep"></span>
-        <button class="toolbar-btn" data-cmd="insertUnorderedList" title="Bullet List">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="4" cy="6" r="1" fill="currentColor"/><circle cx="4" cy="12" r="1" fill="currentColor"/><circle cx="4" cy="18" r="1" fill="currentColor"/></svg>
-        </button>
-        <button class="toolbar-btn" data-cmd="insertOrderedList" title="Numbered List">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><text x="2" y="8" font-size="8" fill="currentColor" font-weight="700" stroke="none">1</text><text x="2" y="14" font-size="8" fill="currentColor" font-weight="700" stroke="none">2</text><text x="2" y="20" font-size="8" fill="currentColor" font-weight="700" stroke="none">3</text></svg>
-        </button>
-        <span class="toolbar-sep"></span>
-        <select class="toolbar-heading-select" id="heading-select" title="Heading">
-          <option value="">Normal</option>
-          <option value="H1">Heading 1</option>
-          <option value="H2">Heading 2</option>
-          <option value="H3">Heading 3</option>
-        </select>
-        <span class="toolbar-sep"></span>
-        <button class="toolbar-btn" data-cmd="hiliteColor" data-val="#f59e0b33" title="Highlight">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="var(--sci)" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="18" width="18" height="4" rx="1"/><path d="M12 2L5 14h14L12 2z" fill="#f59e0b44" stroke="currentColor"/></svg>
-        </button>
-        <button class="toolbar-btn" data-cmd="formatBlock" data-val="PRE" title="Code Block">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
-        </button>
-        <button class="toolbar-btn" data-cmd="removeFormat" title="Clear Formatting">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="4" y1="4" x2="20" y2="20"/><path d="M9 3h6l-3 7"/></svg>
-        </button>
+
+      <div class="hub-modal-body">
+        <!-- Left Sidebar: Attached Items List -->
+        <div class="hub-sidebar">
+          <div class="hub-sidebar-label">ATTACHED CONTENT</div>
+          <div id="hub-items-list" class="hub-items-list">
+            <!-- Dynamic list of notes, videos, pdfs, images -->
+          </div>
+        </div>
+
+        <!-- Right Main: Clean Slate Reader / Media Viewer -->
+        <div id="hub-main-view" class="hub-main-view">
+          
+          <!-- View 1: Clean Slate Reader Mode -->
+          <div id="hub-reader-mode" class="hub-reader-mode">
+            <div class="hub-reader-header">
+              <div class="hub-reader-meta">
+                <span id="reader-item-badge" class="hub-type-badge">NOTE</span>
+                <h2 id="reader-item-title" class="reader-item-title">General Notes</h2>
+              </div>
+              <div class="hub-reader-controls">
+                <button id="btn-edit-item" class="hub-control-btn" title="Edit Content">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                  Edit
+                </button>
+                <button id="btn-delete-item" class="hub-control-btn danger" title="Delete Content">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                  Delete
+                </button>
+              </div>
+            </div>
+            
+            <!-- Clean Slate Viewing Surface -->
+            <div id="clean-slate-container" class="clean-slate-container">
+              <div id="clean-slate-body" class="clean-slate-body">
+                <!-- Rendered Rich Text / Embedded Player -->
+              </div>
+            </div>
+          </div>
+
+          <!-- View 2: Form Editor Mode (Create / Edit Item) -->
+          <div id="hub-editor-mode" class="hub-editor-mode hidden">
+            <div class="hub-editor-header">
+              <h4 id="editor-mode-heading">Add New Resource</h4>
+              <button id="btn-cancel-editor" class="btn-secondary-sm">Cancel</button>
+            </div>
+
+            <div class="hub-form-group">
+              <label>Resource Title</label>
+              <input type="text" id="res-title-input" class="hub-input" placeholder="e.g. NCERT Chapter 3 Notes, Formula Sheet, PyQ Video" />
+            </div>
+
+            <div class="hub-form-group">
+              <label>Content Type</label>
+              <div class="hub-type-selector">
+                <button class="type-btn active" data-type="note">📝 Rich Note</button>
+                <button class="type-btn" data-type="video">🎥 YouTube Video</button>
+                <button class="type-btn" data-type="image">🖼️ Image URL</button>
+                <button class="type-btn" data-type="pdf">📄 PDF / File Link</button>
+                <button class="type-btn" data-type="link">🔗 Web Link</button>
+              </div>
+            </div>
+
+            <!-- Field for URL (Videos, PDFs, Images, Links) -->
+            <div id="res-url-group" class="hub-form-group hidden">
+              <label id="res-url-label">YouTube Video URL</label>
+              <input type="url" id="res-url-input" class="hub-input" placeholder="https://www.youtube.com/watch?v=..." />
+              <span id="res-url-hint" class="res-url-hint">Paste YouTube video link to embed a video player</span>
+            </div>
+
+            <!-- Field for Rich Text Note -->
+            <div id="res-note-group" class="hub-form-group">
+              <label>Rich Text Content</label>
+              <!-- Formatting Toolbar -->
+              <div class="notes-toolbar">
+                <button class="toolbar-btn" data-cmd="bold" title="Bold"><strong>B</strong></button>
+                <button class="toolbar-btn" data-cmd="italic" title="Italic"><em>I</em></button>
+                <button class="toolbar-btn" data-cmd="underline" title="Underline"><u>U</u></button>
+                <span class="toolbar-sep"></span>
+                <button class="toolbar-btn" data-cmd="insertUnorderedList" title="Bullet List">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="4" cy="6" r="1" fill="currentColor"/><circle cx="4" cy="12" r="1" fill="currentColor"/><circle cx="4" cy="18" r="1" fill="currentColor"/></svg>
+                </button>
+                <button class="toolbar-btn" data-cmd="insertOrderedList" title="Numbered List">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/></svg>
+                </button>
+                <span class="toolbar-sep"></span>
+                <select class="toolbar-heading-select" id="heading-select">
+                  <option value="">Normal</option>
+                  <option value="H1">Heading 1</option>
+                  <option value="H2">Heading 2</option>
+                  <option value="H3">Heading 3</option>
+                </select>
+                <span class="toolbar-sep"></span>
+                <button class="toolbar-btn" data-cmd="hiliteColor" data-val="#f59e0b33" title="Highlight">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="var(--sci)" stroke="currentColor" stroke-width="2"><rect x="3" y="18" width="18" height="4" rx="1"/><path d="M12 2L5 14h14L12 2z" fill="#f59e0b44" stroke="currentColor"/></svg>
+                </button>
+                <button class="toolbar-btn" data-cmd="formatBlock" data-val="PRE" title="Code Block">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                </button>
+              </div>
+              <div id="notes-editor" class="notes-editor" contenteditable="true" data-placeholder="Write detailed study notes here..."></div>
+            </div>
+
+            <div class="modal-actions">
+              <button id="btn-save-resource" class="btn-primary">Save Content</button>
+            </div>
+          </div>
+
+        </div>
       </div>
-      <!-- Rich Text Area -->
-      <div id="notes-editor" class="notes-editor" contenteditable="true" data-placeholder="Write your study notes here... Use the toolbar above for formatting."></div>
-      <div class="modal-actions">
-        <span class="notes-hint">Supports bold, italic, lists, headings & highlights</span>
-        <button id="btn-save-notes" class="btn-primary">Save Notes</button>
-      </div>
+
     </div>
   </div>
 

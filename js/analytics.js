@@ -561,3 +561,98 @@ function renderProgressSparkline() {
     </div>
   `;
 }
+
+// ---- Bookmarks & Study Hub Explorer ----
+function renderBookmarkNotes() {
+  const container = document.getElementById('bm-notes-grid');
+  if (!container) return;
+
+  const items = [];
+  const icons = { note: '📝', video: '🎥', image: '🖼️', pdf: '📄', link: '🔗' };
+
+  ['ras','gk','sci'].forEach(examKey => {
+    const data = rawData[examKey];
+    if (!data?.subjects) return;
+
+    data.subjects.forEach(subj => {
+      traverseTopics(subj.topics || [], topic => {
+        const st = userState[examKey]?.[topic.id];
+        if (!st) return;
+
+        const topicTitle = currentLang === 'hi' ? (topic.title_hi || topic.title_en) : (topic.title_en || topic.title_hi);
+        const normSt = normalizeTopicState(st);
+
+        // Add resources
+        if (normSt.resources && normSt.resources.length > 0) {
+          normSt.resources.forEach(res => {
+            items.push({
+              examKey,
+              topicId: topic.id,
+              topicTitle,
+              subjTitle: subj.title_en || subj.title_hi,
+              resId: res.id,
+              title: res.title || 'Untitled',
+              type: res.type || 'note',
+              icon: icons[res.type] || '📄',
+              isBookmark: false
+            });
+          });
+        }
+
+        // Add bookmarks
+        if (normSt.bookmarked) {
+          items.push({
+            examKey,
+            topicId: topic.id,
+            topicTitle,
+            subjTitle: subj.title_en || subj.title_hi,
+            resId: null,
+            title: topicTitle,
+            type: 'bookmark',
+            icon: '🔖',
+            isBookmark: true
+          });
+        }
+      });
+    });
+  });
+
+  if (items.length === 0) {
+    container.innerHTML = `
+      <div class="bm-empty-card" style="grid-column:1/-1;padding:24px;text-align:center;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-muted)">
+        No content resources or bookmarks saved yet.<br/>
+        <span style="font-size:12px">Click the 📎 icon on any topic in the Tracker to attach notes, videos, or PDFs.</span>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = items.map(item => `
+    <div class="bm-card ${item.isBookmark ? 'bm-type-bookmark' : 'bm-type-resource'}" data-exam="${item.examKey}" data-topic-id="${item.topicId}" data-res-id="${item.resId || ''}" data-title="${escapeHTML(item.topicTitle)}">
+      <div class="bm-card-header">
+        <span class="bm-icon">${item.icon}</span>
+        <span class="exam-badge ${item.examKey}">${item.examKey.toUpperCase()}</span>
+      </div>
+      <div class="bm-card-title">${escapeHTML(item.title)}</div>
+      <div class="bm-card-sub">${escapeHTML(item.topicTitle)}</div>
+    </div>
+  `).join('');
+
+  // Click card to open in Clean Slate Reader
+  container.querySelectorAll('.bm-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const examKey = card.getAttribute('data-exam');
+      const topicId = card.getAttribute('data-topic-id');
+      const resId = card.getAttribute('data-res-id');
+      const title = card.getAttribute('data-title');
+
+      if (examKey !== activeExam) {
+        activeExam = examKey;
+        document.querySelectorAll('.exam-btn').forEach(b => b.classList.toggle('active', b.getAttribute('data-exam') === examKey));
+      }
+
+      openStudyHubModal(topicId, title, resId || null);
+    });
+  });
+}
+

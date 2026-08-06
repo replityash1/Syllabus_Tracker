@@ -22,12 +22,36 @@ function saveLocalPreferences() {
 }
 
 // ---- User State (localStorage) ----
+function normalizeTopicState(st) {
+  if (!st || typeof st !== 'object') st = {};
+  if (!Array.isArray(st.resources)) st.resources = [];
+  // Migrate legacy single note string if present and not yet converted
+  if (st.notes && typeof st.notes === 'string' && st.notes.trim() !== '') {
+    const hasNotesItem = st.resources.some(r => r.type === 'note');
+    if (!hasNotesItem) {
+      st.resources.unshift({
+        id: 'res_' + Date.now() + '_legacy',
+        title: 'General Notes',
+        type: 'note',
+        content: st.notes,
+        createdAt: new Date().toISOString()
+      });
+    }
+  }
+  return st;
+}
+
 function loadUserStateFromStorage() {
   ['ras','gk','sci'].forEach(key => {
     userState[key] = {};
     try {
       const parsed = JSON.parse(localStorage.getItem(`examprep_state_${key}`) || 'null');
-      if (parsed && typeof parsed === 'object') userState[key] = parsed;
+      if (parsed && typeof parsed === 'object') {
+        Object.keys(parsed).forEach(tid => {
+          parsed[tid] = normalizeTopicState(parsed[tid]);
+        });
+        userState[key] = parsed;
+      }
     } catch (_) {}
   });
 }
@@ -106,9 +130,9 @@ async function loadFromFirestore() {
     snapshot.forEach(doc => {
       const id = doc.id;
       const d = doc.data();
-      if (id === 'state_ras' && d) { userState.ras = d; localStorage.setItem('examprep_state_ras', JSON.stringify(d)); loaded = true; }
-      if (id === 'state_gk'  && d) { userState.gk  = d; localStorage.setItem('examprep_state_gk',  JSON.stringify(d)); loaded = true; }
-      if (id === 'state_sci' && d) { userState.sci = d; localStorage.setItem('examprep_state_sci', JSON.stringify(d)); loaded = true; }
+      if (id === 'state_ras' && d) { Object.keys(d).forEach(k => d[k] = normalizeTopicState(d[k])); userState.ras = d; localStorage.setItem('examprep_state_ras', JSON.stringify(d)); loaded = true; }
+      if (id === 'state_gk'  && d) { Object.keys(d).forEach(k => d[k] = normalizeTopicState(d[k])); userState.gk  = d; localStorage.setItem('examprep_state_gk',  JSON.stringify(d)); loaded = true; }
+      if (id === 'state_sci' && d) { Object.keys(d).forEach(k => d[k] = normalizeTopicState(d[k])); userState.sci = d; localStorage.setItem('examprep_state_sci', JSON.stringify(d)); loaded = true; }
       if (id === 'activity'  && d) { localStorage.setItem('examprep_activity', JSON.stringify(d)); loaded = true; }
       if (id === 'preferences' && d) {
         if (d.lang) currentLang = d.lang;

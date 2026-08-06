@@ -165,10 +165,12 @@ function renderTopicTreeHTML(topics, examKey, depth) {
     const revSvg = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>`;
     const bkFill = st.bookmarked ? 'currentColor' : 'none';
     const bkSvg  = `<svg width="13" height="13" viewBox="0 0 24 24" fill="${bkFill}" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>`;
+    const resCount = (st.resources && st.resources.length) || (st.notes?.trim() ? 1 : 0);
+    const hasNotes = resCount > 0;
     const noteSvg = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>`;
 
     html += `
-      <div class="topic-row ${st.completed ? 'completed' : ''} ${st.notes?.trim() ? 'has-notes' : ''} depth-${depth} ${hasChildren ? 'is-parent' : 'is-leaf'} ${isExpanded ? 'expanded' : ''}" data-depth="${depth}" data-id="${topic.id}">
+      <div class="topic-row ${st.completed ? 'completed' : ''} ${hasNotes ? 'has-notes' : ''} depth-${depth} ${hasChildren ? 'is-parent' : 'is-leaf'} ${isExpanded ? 'expanded' : ''}" data-depth="${depth}" data-id="${topic.id}">
         <div class="topic-row-header">
           ${hasChildren
             ? `<button class="expand-btn-badge" title="Expand"><span class="arrow">▶</span></button>`
@@ -185,7 +187,10 @@ function renderTopicTreeHTML(topics, examKey, depth) {
               ${revRound > 0 ? `<span style="font-size:10px;font-weight:700">R${revRound}</span>` : revSvg}
             </button>
             <button class="action-btn action-bookmark ${st.bookmarked ? 'active-bookmark' : ''}" data-id="${topic.id}" title="Bookmark">${bkSvg}</button>
-            <button class="action-btn action-notes" data-id="${topic.id}" data-title="${escapeHTML(displayTitle)}" title="Notes">${noteSvg}</button>
+            <button class="action-btn action-notes ${hasNotes ? 'has-content' : ''}" data-id="${topic.id}" data-title="${escapeHTML(displayTitle)}" title="Content Hub & Notes">
+              ${noteSvg}
+              ${hasNotes ? `<span class="res-count-badge">${resCount}</span>` : ''}
+            </button>
           </div>
         </div>
         ${hasChildren ? `<div class="topic-children ${isExpanded ? '' : 'hidden'}">${childResult.html}</div>` : ''}
@@ -417,69 +422,13 @@ function updateContextBar(examKey, pct) {
   `;
 }
 
-// ---- Notes Modal — Rich Text Editor ----
+// ---- Notes & Study Hub Modal ----
 
-function openNotesModal(topicId, title) {
-  activeNotesTopicId = topicId;
-  const st = userState[activeExam][topicId] || {};
-  const modal = document.getElementById('notes-modal');
-  const titleEl = document.getElementById('modal-topic-title');
-  const editor = document.getElementById('notes-editor');
-  if (titleEl) titleEl.textContent = title || 'Topic Notes';
-  if (editor) {
-    editor.innerHTML = st.notes || '';
-    // Focus at end
-    setTimeout(() => {
-      editor.focus();
-      const sel = window.getSelection();
-      sel.selectAllChildren(editor);
-      sel.collapseToEnd();
-    }, 50);
-  }
-  if (modal) modal.classList.remove('hidden');
-
-  // Wire toolbar buttons (once)
-  if (!modal._toolbarWired) {
-    modal._toolbarWired = true;
-    modal.querySelectorAll('.toolbar-btn').forEach(btn => {
-      btn.addEventListener('mousedown', e => {
-        e.preventDefault(); // Keep editor focus
-        const cmd = btn.getAttribute('data-cmd');
-        const val = btn.getAttribute('data-val') || null;
-        document.execCommand(cmd, false, val);
-      });
-    });
-    const headingSelect = document.getElementById('heading-select');
-    if (headingSelect) {
-      headingSelect.addEventListener('change', e => {
-        const val = e.target.value;
-        if (val) {
-          document.execCommand('formatBlock', false, val);
-        } else {
-          document.execCommand('formatBlock', false, 'DIV');
-        }
-        e.target.value = '';
-        document.getElementById('notes-editor')?.focus();
-      });
-    }
-  }
+function openNotesModal(topicId, title, selectResId = null) {
+  openStudyHubModal(topicId, title, selectResId);
 }
 
 function closeNotesModal() {
   activeNotesTopicId = null;
   document.getElementById('notes-modal')?.classList.add('hidden');
-}
-
-function saveCurrentTopicNotes() {
-  if (!activeNotesTopicId) return;
-  const editor = document.getElementById('notes-editor');
-  const html = editor ? editor.innerHTML : '';
-  if (!userState[activeExam][activeNotesTopicId]) userState[activeExam][activeNotesTopicId] = {};
-  userState[activeExam][activeNotesTopicId].notes = html;
-  saveUserStateToStorage();
-  closeNotesModal();
-  // Update has-notes dot without full rerender
-  const row = document.querySelector(`.topic-row[data-id="${activeNotesTopicId}"]`);
-  if (row) row.classList.toggle('has-notes', html.trim().length > 0);
-  showToast('Notes saved!');
 }
