@@ -1,0 +1,141 @@
+/* css/base.css — Design tokens, reset, utilities, scrollbar, body */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+:root {
+  /* Core palette */
+  --bg:         #0c0e14;
+  --bg-card:    #13151d;
+  --bg-card-2:  #181b25;
+  --bg-hover:   #1d2030;
+  --bg-surface: #222639;
+  --border:     #252a3a;
+  --border-glow:#3a3f55;
+
+  /* Text */
+  --text:       #e8eaf0;
+  --text-sec:   #a0a5b8;
+  --text-muted: #6b7089;
+
+  /* Accents */
+  --ras:     #6366f1;
+  --ras-glow:#6366f140;
+  --gk:      #10b981;
+  --gk-glow: #10b98140;
+  --sci:     #f59e0b;
+  --sci-glow:#f59e0b40;
+  --danger:  #ef4444;
+  --purple:  #a855f7;
+
+  /* Gradients */
+  --grad-ras: linear-gradient(135deg, #6366f1, #818cf8);
+  --grad-gk:  linear-gradient(135deg, #10b981, #34d399);
+  --grad-sci: linear-gradient(135deg, #f59e0b, #fcd34d);
+  --grad-hero:linear-gradient(135deg, #1e1b4b 0%, #0c0e14 100%);
+
+  /* Radii / shadows */
+  --radius:    12px;
+  --radius-sm: 8px;
+  --radius-xs: 6px;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,.3);
+  --shadow-md: 0 4px 16px rgba(0,0,0,.4);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,.5);
+  --shadow-glow-ras: 0 0 20px var(--ras-glow);
+  --shadow-glow-gk:  0 0 20px var(--gk-glow);
+  --shadow-glow-sci: 0 0 20px var(--sci-glow);
+
+  /* Subject accent palette */
+  --subj-0: #6366f1; --subj-1: #10b981; --subj-2: #f59e0b;
+  --subj-3: #ec4899; --subj-4: #06b6d4; --subj-5: #8b5cf6;
+  --subj-6: #f43f5e; --subj-7: #14b8a6; --subj-8: #f97316;
+  --subj-9: #3b82f6; --subj-10:#a3e635; --subj-11:#e879f9;
+
+  /* Transitions */
+  --ease: cubic-bezier(.4,0,.2,1);
+  --dur:  .25s;
+}
+
+/* ---- Light Theme ---- */
+[data-theme="light"] {
+  --bg:         #f5f6fa;
+  --bg-card:    #ffffff;
+  --bg-card-2:  #f0f1f5;
+  --bg-hover:   #e8e9ef;
+  --bg-surface: #e2e4eb;
+  --border:     #d4d6de;
+  --border-glow:#bfc2cc;
+  --text:       #1a1c24;
+  --text-sec:   #4a4e5c;
+  --text-muted: #7b7f90;
+  --shadow-sm:  0 1px 3px rgba(0,0,0,.08);
+  --shadow-md:  0 4px 16px rgba(0,0,0,.1);
+  --shadow-lg:  0 8px 32px rgba(0,0,0,.12);
+  --grad-hero:  linear-gradient(135deg, #eef2ff 0%, #f5f6fa 100%);
+}
+[data-theme="light"] .app-header { background: rgba(255,255,255,.9); }
+[data-theme="light"] .auth-overlay { background: #f5f6fa; }
+
+/* Reset */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  min-height: 100vh;
+  overflow-x: hidden;
+  transition: background .3s var(--ease), color .3s var(--ease);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border-glow); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* Utility */
+.hidden { display: none !important; }
+
+a { color: var(--ras); text-decoration: none; }
+
+/* Icon button (header) */
+.icon-btn {
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border); border-radius: var(--radius-xs);
+  background: transparent; color: var(--text-sec);
+  cursor: pointer; transition: all var(--dur) var(--ease);
+}
+.icon-btn:hover { border-color: var(--ras); color: var(--ras); background: #6366f10d; }
+
+/* Staggered card entrance */
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.subject-card, .overlap-card, .hero-metric-card, .exam-arc-card,
+.rev-dist-card, .velocity-card, .bm-card, .subject-breakdown-row {
+  animation: fadeSlideUp .4s var(--ease) both;
+  animation-delay: calc(var(--i, 0) * 60ms);
+}
+
+/* ---- Print styles ---- */
+@media print {
+  body { background: white !important; color: black !important; }
+  .app-header, .context-bar, .tab-nav, .header-right,
+  .exam-selector, .filter-bar, .toast-container,
+  .notes-modal, .auth-overlay { display: none !important; }
+  .subject-card { break-inside: avoid; border: 1px solid #ddd !important; background: white !important; }
+  .topic-actions { display: none !important; }
+  .topics-body { max-height: none !important; }
+  .subject-card .topics-body { display: block !important; }
+}
+
