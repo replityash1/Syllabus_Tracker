@@ -593,6 +593,7 @@ function renderBookmarkNotes() {
               resId: res.id,
               title: res.title || 'Untitled',
               type: res.type || 'note',
+              url: res.url || '',
               icon: icons[res.type] || '📄',
               isBookmark: false
             });
@@ -627,16 +628,27 @@ function renderBookmarkNotes() {
     return;
   }
 
-  container.innerHTML = items.map(item => `
-    <div class="bm-card ${item.isBookmark ? 'bm-type-bookmark' : 'bm-type-resource'}" data-exam="${item.examKey}" data-topic-id="${item.topicId}" data-res-id="${item.resId || ''}" data-title="${escapeHTML(item.topicTitle)}">
-      <div class="bm-card-header">
-        <span class="bm-icon">${item.icon}</span>
-        <span class="exam-badge ${item.examKey}">${item.examKey.toUpperCase()}</span>
+  container.innerHTML = items.map(item => {
+    let thumbHtml = '';
+    if (item.type === 'video') {
+      const thumb = getYouTubeThumbnail(item.url);
+      if (thumb) thumbHtml = `<img src="${thumb}" class="bm-card-thumb" alt="video thumbnail" />`;
+    } else if (item.type === 'image' && item.url) {
+      thumbHtml = `<img src="${escapeHTML(item.url)}" class="bm-card-thumb" alt="image thumbnail" />`;
+    }
+
+    return `
+      <div class="bm-card ${item.isBookmark ? 'bm-type-bookmark' : 'bm-type-resource'}" data-exam="${item.examKey}" data-topic-id="${item.topicId}" data-res-id="${item.resId || ''}" data-title="${escapeHTML(item.topicTitle)}">
+        <div class="bm-card-header">
+          <span class="bm-icon">${item.icon}</span>
+          <span class="exam-badge ${item.examKey}">${item.examKey.toUpperCase()}</span>
+        </div>
+        ${thumbHtml}
+        <div class="bm-card-title">${escapeHTML(item.title)}</div>
+        <div class="bm-card-sub">${escapeHTML(item.topicTitle)}</div>
       </div>
-      <div class="bm-card-title">${escapeHTML(item.title)}</div>
-      <div class="bm-card-sub">${escapeHTML(item.topicTitle)}</div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 
   // Click card to open in Clean Slate Reader
   container.querySelectorAll('.bm-card').forEach(card => {

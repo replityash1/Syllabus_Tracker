@@ -126,15 +126,27 @@ function renderHubSidebar(resources, activeResId = null) {
   }
 
   const icons = { note: '📝', video: '🎥', image: '🖼️', pdf: '📄', link: '🔗' };
-  container.innerHTML = resources.map(r => `
-    <div class="hub-item-card ${r.id === activeResId ? 'active' : ''}" data-res-id="${r.id}">
-      <span class="hub-item-icon">${icons[r.type] || '📄'}</span>
-      <div class="hub-item-info">
-        <div class="hub-item-title">${escapeHTML(r.title || 'Untitled')}</div>
-        <div class="hub-item-type">${r.type}</div>
+  container.innerHTML = resources.map(r => {
+    let visualIcon = `<span class="hub-item-icon">${icons[r.type] || '📄'}</span>`;
+    if (r.type === 'video') {
+      const ytThumb = getYouTubeThumbnail(r.url);
+      if (ytThumb) {
+        visualIcon = `<img src="${ytThumb}" class="hub-item-thumb" alt="video thumbnail" />`;
+      }
+    } else if (r.type === 'image' && r.url) {
+      visualIcon = `<img src="${escapeHTML(r.url)}" class="hub-item-thumb" alt="image thumbnail" />`;
+    }
+
+    return `
+      <div class="hub-item-card ${r.id === activeResId ? 'active' : ''}" data-res-id="${r.id}">
+        ${visualIcon}
+        <div class="hub-item-info">
+          <div class="hub-item-title">${escapeHTML(r.title || 'Untitled')}</div>
+          <div class="hub-item-type">${r.type}</div>
+        </div>
       </div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 
   // Attach click listener
   container.querySelectorAll('.hub-item-card').forEach(card => {
@@ -170,20 +182,30 @@ function selectResourceItem(resId) {
   renderCleanSlateBody(resItem);
 }
 
+function renderMarkdownOrHtml(content) {
+  if (!content || !content.trim()) return '<p style="color:var(--text-muted);font-style:italic">Empty note.</p>';
+  if (typeof window.marked !== 'undefined' && typeof window.marked.parse === 'function') {
+    try {
+      return window.marked.parse(content);
+    } catch (_) {}
+  }
+  return content;
+}
+
 function renderCleanSlateBody(resItem) {
   const container = document.getElementById('clean-slate-body');
   if (!container) return;
 
   if (resItem.type === 'note') {
-    container.innerHTML = `<div class="clean-slate-rich-text">${resItem.content || '<p style="color:var(--text-muted);font-style:italic">Empty note.</p>'}</div>`;
+    container.innerHTML = `<div class="clean-slate-rich-text">${renderMarkdownOrHtml(resItem.content)}</div>`;
   } else if (resItem.type === 'video') {
     const embedUrl = parseYouTubeEmbedUrl(resItem.url);
     if (embedUrl) {
       container.innerHTML = `
         <div class="media-embed-video">
-          <iframe src="${embedUrl}" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>
+          <iframe src="${embedUrl}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
         </div>
-        ${resItem.content ? `<div class="clean-slate-rich-text" style="margin-top:16px">${resItem.content}</div>` : ''}
+        ${resItem.content ? `<div class="clean-slate-rich-text" style="margin-top:16px">${renderMarkdownOrHtml(resItem.content)}</div>` : ''}
       `;
     } else {
       container.innerHTML = `
@@ -191,9 +213,10 @@ function renderCleanSlateBody(resItem) {
           <span class="card-icon">🎥</span>
           <div class="card-details">
             <div class="card-title">${escapeHTML(resItem.title)}</div>
-            <a href="${escapeHTML(resItem.url)}" target="_blank" rel="noopener" class="card-url">${escapeHTML(resItem.url)}</a>
+            <a href="${escapeHTML(resItem.url)}" target="_blank" rel="noopener" class="card-url">${escapeHTML(resItem.url)} ↗</a>
           </div>
         </div>
+        ${resItem.content ? `<div class="clean-slate-rich-text">${renderMarkdownOrHtml(resItem.content)}</div>` : ''}
       `;
     }
   } else if (resItem.type === 'image') {
@@ -203,18 +226,20 @@ function renderCleanSlateBody(resItem) {
           <img src="${escapeHTML(resItem.url)}" alt="${escapeHTML(resItem.title)}" onerror="this.src='https://placehold.co/600x400?text=Image+Load+Failed'" />
         </a>
       </div>
-      ${resItem.content ? `<div class="clean-slate-rich-text" style="margin-top:16px">${resItem.content}</div>` : ''}
+      ${resItem.content ? `<div class="clean-slate-rich-text" style="margin-top:16px">${renderMarkdownOrHtml(resItem.content)}</div>` : ''}
     `;
   } else if (resItem.type === 'pdf') {
+    const isDataUrl = resItem.url && resItem.url.startsWith('data:application/pdf');
     container.innerHTML = `
       <div class="media-embed-card">
         <span class="card-icon">📄</span>
         <div class="card-details">
           <div class="card-title">${escapeHTML(resItem.title)}</div>
-          <a href="${escapeHTML(resItem.url)}" target="_blank" rel="noopener" class="card-url">Open / Download PDF File ↗</a>
+          <a href="${escapeHTML(resItem.url)}" target="_blank" rel="noopener" class="card-url">${isDataUrl ? 'Download / View Attached PDF ↗' : escapeHTML(resItem.url) + ' ↗'}</a>
         </div>
       </div>
-      ${resItem.content ? `<div class="clean-slate-rich-text">${resItem.content}</div>` : ''}
+      ${resItem.url ? `<object data="${escapeHTML(resItem.url)}" type="application/pdf" class="media-embed-pdf-object"><p>PDF preview not available. <a href="${escapeHTML(resItem.url)}" target="_blank">Click here to open/download PDF</a></p></object>` : ''}
+      ${resItem.content ? `<div class="clean-slate-rich-text">${renderMarkdownOrHtml(resItem.content)}</div>` : ''}
     `;
   } else { // link
     container.innerHTML = `
@@ -225,7 +250,7 @@ function renderCleanSlateBody(resItem) {
           <a href="${escapeHTML(resItem.url)}" target="_blank" rel="noopener" class="card-url">${escapeHTML(resItem.url)} ↗</a>
         </div>
       </div>
-      ${resItem.content ? `<div class="clean-slate-rich-text">${resItem.content}</div>` : ''}
+      ${resItem.content ? `<div class="clean-slate-rich-text">${renderMarkdownOrHtml(resItem.content)}</div>` : ''}
     `;
   }
 }
@@ -336,10 +361,48 @@ function saveResourceItem() {
   updateTopicRowResourceBadgeDOM(activeNotesTopicId, st.resources.length);
 }
 
-function deleteResourceItem() {
+function showConfirmDialog(title, message, confirmText = 'Delete') {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('confirm-modal');
+    const titleEl = document.getElementById('confirm-title');
+    const msgEl = document.getElementById('confirm-message');
+    const okBtn = document.getElementById('confirm-btn-ok');
+    const cancelBtn = document.getElementById('confirm-btn-cancel');
+    const backdrop = document.getElementById('confirm-backdrop');
+
+    if (titleEl) titleEl.textContent = title || 'Confirm Delete';
+    if (msgEl) msgEl.textContent = message || 'Are you sure you want to delete this item?';
+    if (okBtn) okBtn.textContent = confirmText;
+
+    if (modal) modal.classList.remove('hidden');
+
+    const cleanup = (result) => {
+      if (modal) modal.classList.add('hidden');
+      okBtn?.removeEventListener('click', onOk);
+      cancelBtn?.removeEventListener('click', onCancel);
+      backdrop?.removeEventListener('click', onCancel);
+      resolve(result);
+    };
+
+    const onOk = () => cleanup(true);
+    const onCancel = () => cleanup(false);
+
+    okBtn?.addEventListener('click', onOk);
+    cancelBtn?.addEventListener('click', onCancel);
+    backdrop?.addEventListener('click', onCancel);
+  });
+}
+
+async function deleteResourceItem() {
   if (!activeNotesTopicId || !activeSelectedResId) return;
   const st = userState[activeExam][activeNotesTopicId];
   if (!st || !st.resources) return;
+
+  const itemToDelete = st.resources.find(r => r.id === activeSelectedResId);
+  const itemTitle = itemToDelete ? `"${itemToDelete.title || 'this item'}"` : 'this item';
+
+  const confirmed = await showConfirmDialog('Delete Content?', `Are you sure you want to delete ${itemTitle}? This action cannot be undone.`, 'Delete');
+  if (!confirmed) return;
 
   st.resources = st.resources.filter(r => r.id !== activeSelectedResId);
   
@@ -378,11 +441,21 @@ function updateTopicRowResourceBadgeDOM(topicId, count) {
   }
 }
 
-function parseYouTubeEmbedUrl(url) {
+function getYouTubeVideoId(url) {
   if (!url) return null;
-  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+  const regExp = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?|shorts|live)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
   const match = url.match(regExp);
-  return (match && match[2].length === 11) ? `https://www.youtube.com/embed/${match[2]}` : null;
+  return match ? match[1] : null;
+}
+
+function parseYouTubeEmbedUrl(url) {
+  const id = getYouTubeVideoId(url);
+  return id ? `https://www.youtube.com/embed/${id}` : null;
+}
+
+function getYouTubeThumbnail(url) {
+  const id = getYouTubeVideoId(url);
+  return id ? `https://img.youtube.com/vi/${id}/hqdefault.jpg` : null;
 }
 
 function wireToolbarButtonsOnce() {
@@ -398,6 +471,46 @@ function wireToolbarButtonsOnce() {
       document.execCommand(cmd, false, val);
     });
   });
+
+  // Local File Upload Listener (Images & PDFs)
+  const fileInput = document.getElementById('res-file-input');
+  const browseBtn = document.getElementById('btn-browse-file');
+  if (browseBtn && fileInput) {
+    browseBtn.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      if (file.size > 3.5 * 1024 * 1024) {
+        showToast('File size must be under 3.5 MB for database sync', 'warning');
+        e.target.value = '';
+        return;
+      }
+
+      const display = document.getElementById('file-name-display');
+      if (display) {
+        display.textContent = `Attached: ${file.name} (${(file.size / 1024).toFixed(0)} KB)`;
+        display.classList.remove('hidden');
+      }
+
+      const reader = new FileReader();
+      reader.onload = ev => {
+        const dataUrl = ev.target.result;
+        const urlInput = document.getElementById('res-url-input');
+        if (urlInput) urlInput.value = dataUrl;
+
+        const titleInput = document.getElementById('res-title-input');
+        if (titleInput && !titleInput.value) {
+          titleInput.value = file.name.replace(/\.[^/.]+$/, "");
+        }
+
+        // Auto set type if image or pdf
+        if (file.type.startsWith('image/')) setResourceType('image');
+        else if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) setResourceType('pdf');
+      };
+      reader.readAsDataURL(file);
+    });
+  }
 
   const headingSelect = document.getElementById('heading-select');
   if (headingSelect) {
