@@ -430,5 +430,7 @@ function openNotesModal(topicId, title, selectResId = null) {
 
 function closeNotesModal() {
   activeNotesTopicId = null;
+  const slate = document.getElementById('clean-slate-body');
+  if (slate) slate.innerHTML = '';
   document.getElementById('notes-modal')?.classList.add('hidden');
 }

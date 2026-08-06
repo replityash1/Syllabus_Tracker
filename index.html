@@ -366,11 +366,24 @@
               <span id="res-url-hint" class="res-url-hint">Paste YouTube video link to embed a video player</span>
             </div>
 
-            <!-- Start Time Field for YouTube Videos -->
+            <!-- Start Time Fields for YouTube Videos (Hr, Min, Sec) -->
             <div id="res-time-group" class="hub-form-group hidden">
               <label>Start Video From (Optional)</label>
-              <input type="text" id="res-time-input" class="hub-input" placeholder="e.g. 1h 25m 23s  or  1:25:23  or  45s" />
-              <span class="res-url-hint">Specify timestamp to start playback from (e.g. 1h 25m 23s). Leave blank to start from 0:00</span>
+              <div class="time-inputs-grid">
+                <div class="time-box">
+                  <input type="number" id="res-time-hr" class="hub-input time-num-input" min="0" max="99" placeholder="0" />
+                  <span class="time-unit">hr</span>
+                </div>
+                <div class="time-box">
+                  <input type="number" id="res-time-min" class="hub-input time-num-input" min="0" max="59" placeholder="0" />
+                  <span class="time-unit">min</span>
+                </div>
+                <div class="time-box">
+                  <input type="number" id="res-time-sec" class="hub-input time-num-input" min="0" max="59" placeholder="0" />
+                  <span class="time-unit">sec</span>
+                </div>
+              </div>
+              <span class="res-url-hint">Fill hours, minutes, or seconds to jump into the video. Empty boxes count as 0</span>
             </div>
 
             <!-- Field for Rich Text / Markdown Note -->

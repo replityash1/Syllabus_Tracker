@@ -319,7 +319,9 @@ function showResourceEditor(resToEdit = null) {
   const heading = document.getElementById('editor-mode-heading');
   const titleInput = document.getElementById('res-title-input');
   const urlInput = document.getElementById('res-url-input');
-  const timeInput = document.getElementById('res-time-input');
+  const hrInput = document.getElementById('res-time-hr');
+  const minInput = document.getElementById('res-time-min');
+  const secInput = document.getElementById('res-time-sec');
   const editor = document.getElementById('notes-editor');
 
   // Reset file upload info display
@@ -334,7 +336,21 @@ function showResourceEditor(resToEdit = null) {
   if (heading) heading.textContent = resToEdit ? 'Edit Content' : 'Add New Content';
   if (titleInput) titleInput.value = resToEdit ? resToEdit.title : '';
   if (urlInput) urlInput.value = resToEdit ? (resToEdit.url || '') : '';
-  if (timeInput) timeInput.value = resToEdit ? (resToEdit.startTime || '') : '';
+  
+  if (resToEdit && (resToEdit.startTimeSec || resToEdit.startTime)) {
+    const totalSec = parseTimeToSeconds(resToEdit.startTimeSec || resToEdit.startTime);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    if (hrInput) hrInput.value = h > 0 ? h : '';
+    if (minInput) minInput.value = m > 0 ? m : '';
+    if (secInput) secInput.value = s > 0 ? s : '';
+  } else {
+    if (hrInput) hrInput.value = '';
+    if (minInput) minInput.value = '';
+    if (secInput) secInput.value = '';
+  }
+
   if (editor) editor.innerHTML = resToEdit ? (resToEdit.content || '') : '';
 
   // Set type
@@ -394,12 +410,19 @@ function saveResourceItem() {
   if (!activeNotesTopicId) return;
   const titleInput = document.getElementById('res-title-input');
   const urlInput = document.getElementById('res-url-input');
-  const timeInput = document.getElementById('res-time-input');
+  const hrInput = document.getElementById('res-time-hr');
+  const minInput = document.getElementById('res-time-min');
+  const secInput = document.getElementById('res-time-sec');
   const editor = document.getElementById('notes-editor');
 
   const title = titleInput?.value.trim() || (currentResType === 'note' ? 'General Notes' : 'Resource Link');
   const url = urlInput?.value.trim() || '';
-  const startTime = timeInput?.value.trim() || '';
+
+  const hr = parseInt(hrInput?.value, 10) || 0;
+  const min = parseInt(minInput?.value, 10) || 0;
+  const sec = parseInt(secInput?.value, 10) || 0;
+  const startTimeSec = (hr * 3600) + (min * 60) + sec;
+
   const content = editor?.innerHTML || '';
 
   const st = userState[activeExam][activeNotesTopicId] || {};
@@ -408,7 +431,7 @@ function saveResourceItem() {
   if (editingResId) {
     const idx = st.resources.findIndex(r => r.id === editingResId);
     if (idx !== -1) {
-      st.resources[idx] = { ...st.resources[idx], title, type: currentResType, url, startTime, content };
+      st.resources[idx] = { ...st.resources[idx], title, type: currentResType, url, startTimeSec, content };
     }
   } else {
     const newItem = {
@@ -416,7 +439,7 @@ function saveResourceItem() {
       title,
       type: currentResType,
       url,
-      startTime,
+      startTimeSec,
       content,
       createdAt: new Date().toISOString()
     };
