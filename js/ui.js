@@ -6,6 +6,23 @@ let activeSelectedResId = null;
 let editingResId = null;
 let currentResType = 'note';
 
+// ---- Hub State ----
+let hubCurrentView = 'library';
+let hubResourceFilter = 'all';
+let hubViewMode = 'grid';
+let hubSearchQuery = '';
+
+const HUB_RESOURCE_TYPES = {
+  note:  { icon: '📝', label: 'Rich Note',        color: '#6366f1' },
+  video: { icon: '▶️', label: 'YouTube Video',    color: '#ef4444' },
+  pdf:   { icon: '📄', label: 'PDF Document',     color: '#f97316' },
+  image: { icon: '🖼️', label: 'Image',            color: '#10b981' },
+  link:  { icon: '🌐', label: 'Website Link',     color: '#3b82f6' },
+  audio: { icon: '🎵', label: 'Audio',            color: '#8b5cf6' },
+  book:  { icon: '📚', label: 'Book / Reference', color: '#d97706' },
+  other: { icon: '📦', label: 'Other Resource',   color: '#6b7280' },
+};
+
 // ---- Theme toggle ----
 function initTheme() {
   const saved = localStorage.getItem('examprep_theme') || 'dark';
@@ -84,7 +101,16 @@ function handleGuestMode() {
   });
 }
 
-// ---- Study Hub & Clean Slate Reader Modal ----
+// ---- Study Hub & Clean Slate Reader Modal (4-View) ----
+
+function showHubView(view) {
+  hubCurrentView = view;
+  ['library', 'picker', 'editor', 'reader'].forEach(v => {
+    document.getElementById(`hub-view-${v}`)?.classList.toggle('hidden', v !== view);
+  });
+  const backBtn = document.getElementById('hub-back-btn');
+  if (backBtn) backBtn.classList.toggle('hidden', view === 'library');
+}
 
 function openStudyHubModal(topicId, title, selectResId = null) {
   activeNotesTopicId = topicId;
@@ -96,62 +122,153 @@ function openStudyHubModal(topicId, title, selectResId = null) {
   const breadcrumbEl = document.getElementById('hub-breadcrumb');
 
   const examLabel = EXAMS[activeExam]?.label || activeExam.toUpperCase();
-  if (breadcrumbEl) breadcrumbEl.textContent = `${examLabel} > Topic Content`;
+  if (breadcrumbEl) breadcrumbEl.textContent = `${examLabel} › Topic Content`;
   if (titleEl) titleEl.textContent = title || 'Topic Content Hub';
+
+  hubSearchQuery = '';
+  hubResourceFilter = 'all';
+  const searchEl = document.getElementById('hub-search-input');
+  if (searchEl) searchEl.value = '';
+  document.querySelectorAll('.hub-filter-pill').forEach(p =>
+    p.classList.toggle('active', p.getAttribute('data-filter') === 'all')
+  );
 
   if (modal) modal.classList.remove('hidden');
 
-  // Render sidebar
-  renderHubSidebar(st.resources, selectResId);
+  showHubView('library');
+  renderResourceLibrary(st.resources);
 
-  // Select initial item or show form if empty
-  if (st.resources.length > 0) {
-    const targetId = selectResId || st.resources[0].id;
-    const targetItem = st.resources.find(r => r.id === targetId) || st.resources[0];
-    selectResourceItem(targetItem.id);
-  } else {
-    showResourceEditor(null);
+  if (selectResId && st.resources.find(r => r.id === selectResId)) {
+    selectResourceItem(selectResId);
   }
 
   wireToolbarButtonsOnce();
 }
 
 function renderHubSidebar(resources, activeResId = null) {
+  // Keep hidden sidebar in sync for compatibility (analytics etc.)
   const container = document.getElementById('hub-items-list');
   if (!container) return;
+  const icons = { note: '📝', video: '🎥', image: '🖼️', pdf: '📄', link: '🔗' };
+  container.innerHTML = resources.map(r =>
+    `<div class="hub-item-card ${r.id === activeResId ? 'active' : ''}" data-res-id="${r.id}">
+      <span>${icons[r.type] || '📄'}</span>
+      <div class="hub-item-info">
+        <div class="hub-item-title">${escapeHTML(r.title || 'Untitled')}</div>
+        <div class="hub-item-type">${r.type}</div>
+      </div>
+    </div>`
+  ).join('');
+}
+
+function renderResourceLibrary(resources) {
+  renderHubSidebar(resources, activeSelectedResId);
+
+  const grid = document.getElementById('hub-resource-grid');
+  const emptyState = document.getElementById('hub-empty-state');
+  if (!grid) return;
+
+  let filtered = resources;
+  if (hubResourceFilter !== 'all') filtered = resources.filter(r => r.type === hubResourceFilter);
+  if (hubSearchQuery) {
+    const q = hubSearchQuery;
+    filtered = filtered.filter(r =>
+      (r.title || '').toLowerCase().includes(q) ||
+      (r.url || '').toLowerCase().includes(q)
+    );
+  }
 
   if (resources.length === 0) {
-    container.innerHTML = `<div style="font-size:11px;color:var(--text-muted);padding:12px;text-align:center">No content attached yet.<br/>Click <strong>+ Add Content</strong> above.</div>`;
+    grid.innerHTML = ''; grid.classList.add('hidden');
+    emptyState?.classList.remove('hidden');
+    return;
+  }
+  grid.classList.remove('hidden');
+  emptyState?.classList.add('hidden');
+
+  const isListView = hubViewMode === 'list';
+  grid.className = `hub-resource-grid ${isListView ? 'hub-list-view' : 'hub-grid-view'}`;
+
+  if (filtered.length === 0) {
+    grid.innerHTML = `<div class="hub-no-results">No resources match your filter or search.</div>`;
     return;
   }
 
-  const icons = { note: '📝', video: '🎥', image: '🖼️', pdf: '📄', link: '🔗' };
-  container.innerHTML = resources.map(r => {
-    let visualIcon = `<span class="hub-item-icon">${icons[r.type] || '📄'}</span>`;
-    if (r.type === 'video') {
-      const ytThumb = getYouTubeThumbnail(r.url);
-      if (ytThumb) {
-        visualIcon = `<img src="${ytThumb}" class="hub-item-thumb" alt="video thumbnail" />`;
-      }
-    } else if (r.type === 'image' && r.url) {
-      visualIcon = `<img src="${escapeHTML(r.url)}" class="hub-item-thumb" alt="image thumbnail" />`;
+  grid.innerHTML = filtered.map(r => {
+    const tc = HUB_RESOURCE_TYPES[r.type] || HUB_RESOURCE_TYPES.other;
+    const ytThumb = r.type === 'video' ? getYouTubeThumbnail(r.url) : null;
+    const imgThumb = r.type === 'image' && r.url && !r.url.startsWith('data:') ? r.url : null;
+    const dateStr = r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '';
+
+    if (isListView) {
+      return `
+        <div class="hub-res-card hub-res-list-card" data-res-id="${r.id}">
+          <span class="hrc-icon-sm">${tc.icon}</span>
+          <div class="hrc-list-info">
+            <div class="hrc-list-title">${escapeHTML(r.title || 'Untitled')}</div>
+            <div class="hrc-list-meta">${tc.label}${dateStr ? ' · ' + dateStr : ''}</div>
+          </div>
+          <div class="hrc-list-actions">
+            <button class="hrc-action-btn hrc-edit" data-res-id="${r.id}" title="Edit">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </button>
+            <button class="hrc-action-btn hrc-delete" data-res-id="${r.id}" title="Delete">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+            </button>
+          </div>
+          <button class="hrc-open-btn" data-res-id="${r.id}">Open →</button>
+        </div>`;
     }
 
+    let thumbHtml = '';
+    if (ytThumb) thumbHtml = `<div class="hrc-thumb"><img src="${ytThumb}" alt="thumbnail" /></div>`;
+    else if (imgThumb) thumbHtml = `<div class="hrc-thumb"><img src="${escapeHTML(imgThumb)}" alt="preview" /></div>`;
+
     return `
-      <div class="hub-item-card ${r.id === activeResId ? 'active' : ''}" data-res-id="${r.id}">
-        ${visualIcon}
-        <div class="hub-item-info">
-          <div class="hub-item-title">${escapeHTML(r.title || 'Untitled')}</div>
-          <div class="hub-item-type">${r.type}</div>
+      <div class="hub-res-card" data-res-id="${r.id}">
+        ${thumbHtml}
+        <div class="hrc-body">
+          <div class="hrc-top">
+            <span class="hrc-type-pill" style="--type-color:${tc.color}">${tc.icon} ${tc.label}</span>
+          </div>
+          <div class="hrc-title">${escapeHTML(r.title || 'Untitled')}</div>
+          ${dateStr ? `<div class="hrc-date">${dateStr}</div>` : ''}
         </div>
-      </div>
-    `;
+        <div class="hrc-footer">
+          <button class="hrc-action-btn hrc-edit" data-res-id="${r.id}" title="Edit">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+          <button class="hrc-action-btn hrc-delete" data-res-id="${r.id}" title="Delete">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+          </button>
+          <button class="hrc-open-btn" data-res-id="${r.id}">Open →</button>
+        </div>
+      </div>`;
   }).join('');
 
-  // Attach click listener
-  container.querySelectorAll('.hub-item-card').forEach(card => {
-    card.addEventListener('click', () => {
+  // Card click → open reader
+  grid.querySelectorAll('.hub-res-card').forEach(card => {
+    card.addEventListener('click', e => {
+      if (e.target.closest('.hrc-action-btn') || e.target.closest('.hrc-open-btn')) return;
       selectResourceItem(card.getAttribute('data-res-id'));
+    });
+  });
+  grid.querySelectorAll('.hrc-open-btn').forEach(btn => {
+    btn.addEventListener('click', e => { e.stopPropagation(); selectResourceItem(btn.getAttribute('data-res-id')); });
+  });
+  grid.querySelectorAll('.hrc-edit').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const st = userState[activeExam][activeNotesTopicId];
+      const item = st?.resources?.find(r => r.id === btn.getAttribute('data-res-id'));
+      if (item) showResourceEditor(item);
+    });
+  });
+  grid.querySelectorAll('.hrc-delete').forEach(btn => {
+    btn.addEventListener('click', async e => {
+      e.stopPropagation();
+      activeSelectedResId = btn.getAttribute('data-res-id');
+      await deleteResourceItem();
     });
   });
 }
@@ -163,22 +280,21 @@ function selectResourceItem(resId) {
   const resItem = st.resources.find(r => r.id === resId);
   if (!resItem) return;
 
-  // Highlight in sidebar
+  // Update hidden sidebar highlight
   document.querySelectorAll('.hub-item-card').forEach(card => {
     card.classList.toggle('active', card.getAttribute('data-res-id') === resId);
   });
 
-  // Switch to reader mode view
-  document.getElementById('hub-reader-mode')?.classList.remove('hidden');
-  document.getElementById('hub-editor-mode')?.classList.add('hidden');
+  // Switch to reader view
+  showHubView('reader');
 
-  // Populate reader mode header
+  // Populate reader header
+  const tc = HUB_RESOURCE_TYPES[resItem.type] || { icon: '📄', label: resItem.type.toUpperCase() };
   const badge = document.getElementById('reader-item-badge');
   const title = document.getElementById('reader-item-title');
-  if (badge) badge.textContent = resItem.type.toUpperCase();
+  if (badge) badge.textContent = `${tc.icon} ${tc.label}`;
   if (title) title.textContent = resItem.title || 'Untitled';
 
-  // Render Clean Slate Viewing Surface
   renderCleanSlateBody(resItem);
 }
 
@@ -313,30 +429,22 @@ function renderCleanSlateBody(resItem) {
 
 function showResourceEditor(resToEdit = null) {
   editingResId = resToEdit ? resToEdit.id : null;
-  document.getElementById('hub-reader-mode')?.classList.add('hidden');
-  document.getElementById('hub-editor-mode')?.classList.remove('hidden');
 
-  const heading = document.getElementById('editor-mode-heading');
   const titleInput = document.getElementById('res-title-input');
   const urlInput = document.getElementById('res-url-input');
   const hrInput = document.getElementById('res-time-hr');
   const minInput = document.getElementById('res-time-min');
   const secInput = document.getElementById('res-time-sec');
   const editor = document.getElementById('notes-editor');
-
-  // Reset file upload info display
   const fileDisplay = document.getElementById('file-name-display');
-  if (fileDisplay) {
-    fileDisplay.textContent = '';
-    fileDisplay.classList.add('hidden');
-  }
   const fileInput = document.getElementById('res-file-input');
+
+  if (fileDisplay) { fileDisplay.textContent = ''; fileDisplay.classList.add('hidden'); }
   if (fileInput) fileInput.value = '';
 
-  if (heading) heading.textContent = resToEdit ? 'Edit Content' : 'Add New Content';
   if (titleInput) titleInput.value = resToEdit ? resToEdit.title : '';
   if (urlInput) urlInput.value = resToEdit ? (resToEdit.url || '') : '';
-  
+
   if (resToEdit && (resToEdit.startTimeSec || resToEdit.startTime)) {
     const totalSec = parseTimeToSeconds(resToEdit.startTimeSec || resToEdit.startTime);
     const h = Math.floor(totalSec / 3600);
@@ -353,15 +461,19 @@ function showResourceEditor(resToEdit = null) {
 
   if (editor) editor.innerHTML = resToEdit ? (resToEdit.content || '') : '';
 
-  // Set type
-  setResourceType(resToEdit ? resToEdit.type : 'note');
+  setResourceType(resToEdit ? resToEdit.type : currentResType);
+  showHubView('editor');
 }
 
 function setResourceType(type) {
   currentResType = type;
-  document.querySelectorAll('.type-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.getAttribute('data-type') === type);
-  });
+
+  const tc = HUB_RESOURCE_TYPES[type] || { icon: '📦', label: type };
+  const badge = document.getElementById('hub-editor-type-badge');
+  const heading = document.getElementById('editor-mode-heading');
+  if (badge) badge.textContent = `${tc.icon} ${tc.label}`;
+  if (heading && !editingResId) heading.textContent = `Add ${tc.label}`;
+  else if (heading && editingResId) heading.textContent = `Edit ${tc.label}`;
 
   const urlGroup = document.getElementById('res-url-group');
   const timeGroup = document.getElementById('res-time-group');
@@ -371,7 +483,7 @@ function setResourceType(type) {
   const urlHint = document.getElementById('res-url-hint');
   const fileOpt = document.getElementById('file-upload-option');
 
-  if (type === 'note') {
+  if (type === 'note' || type === 'book') {
     urlGroup?.classList.add('hidden');
     timeGroup?.classList.add('hidden');
     noteGroup?.classList.remove('hidden');
@@ -384,11 +496,10 @@ function setResourceType(type) {
       if (fileOpt) fileOpt.classList.add('hidden');
       if (urlLabel) urlLabel.textContent = 'YouTube Video URL';
       if (urlInput) urlInput.placeholder = 'https://www.youtube.com/watch?v=...';
-      if (urlHint) urlHint.textContent = 'Paste a YouTube video link to play it directly in the app';
+      if (urlHint) urlHint.textContent = 'Paste a YouTube link to embed a player with optional start time';
     } else {
       timeGroup?.classList.add('hidden');
       if (fileOpt) fileOpt.classList.remove('hidden');
-
       if (type === 'image') {
         if (urlLabel) urlLabel.textContent = 'Image URL or Upload File';
         if (urlInput) urlInput.placeholder = 'https://example.com/image.jpg or click Browse Local File';
@@ -397,6 +508,11 @@ function setResourceType(type) {
         if (urlLabel) urlLabel.textContent = 'PDF Document / Upload File';
         if (urlInput) urlInput.placeholder = 'https://example.com/doc.pdf or click Browse Local File';
         if (urlHint) urlHint.textContent = 'Paste a PDF link or click Browse Local File';
+      } else if (type === 'audio') {
+        if (fileOpt) fileOpt.classList.add('hidden');
+        if (urlLabel) urlLabel.textContent = 'Audio URL';
+        if (urlInput) urlInput.placeholder = 'https://example.com/lecture.mp3';
+        if (urlHint) urlHint.textContent = 'Paste a link to an audio file or streaming service';
       } else {
         if (urlLabel) urlLabel.textContent = 'Web Link';
         if (urlInput) urlInput.placeholder = 'https://example.com';
@@ -456,11 +572,11 @@ function saveResourceItem() {
   saveUserStateToStorage();
   showToast('Content saved!');
 
-  // Refresh modal UI
-  renderHubSidebar(st.resources, editingResId || activeSelectedResId);
-  selectResourceItem(editingResId || activeSelectedResId);
+  // Refresh library and navigate to reader
+  const savedId = editingResId || activeSelectedResId;
+  renderResourceLibrary(st.resources);
+  selectResourceItem(savedId);
 
-  // Update topic row badge in DOM
   updateTopicRowResourceBadgeDOM(activeNotesTopicId, st.resources.length);
 }
 
@@ -518,14 +634,10 @@ async function deleteResourceItem() {
 
   updateTopicRowResourceBadgeDOM(activeNotesTopicId, st.resources.length);
 
-  if (st.resources.length > 0) {
-    renderHubSidebar(st.resources, st.resources[0].id);
-    selectResourceItem(st.resources[0].id);
-  } else {
-    renderHubSidebar([]);
-    showResourceEditor(null);
-  }
+  renderResourceLibrary(st.resources);
+  showHubView('library');
 }
+
 
 function updateTopicRowResourceBadgeDOM(topicId, count) {
   const row = document.querySelector(`.topic-row[data-id="${topicId}"]`);
@@ -576,6 +688,7 @@ function wireToolbarButtonsOnce() {
   if (!modal || modal._toolbarWired) return;
   modal._toolbarWired = true;
 
+  // Rich text toolbar
   modal.querySelectorAll('.toolbar-btn').forEach(btn => {
     btn.addEventListener('mousedown', e => {
       e.preventDefault();
@@ -585,46 +698,7 @@ function wireToolbarButtonsOnce() {
     });
   });
 
-  // Local File Upload Listener (Images & PDFs)
-  const fileInput = document.getElementById('res-file-input');
-  const browseBtn = document.getElementById('btn-browse-file');
-  if (browseBtn && fileInput) {
-    browseBtn.addEventListener('click', () => fileInput.click());
-    fileInput.addEventListener('change', e => {
-      const file = e.target.files[0];
-      if (!file) return;
-
-      if (file.size > 3.5 * 1024 * 1024) {
-        showToast('File size must be under 3.5 MB for database sync', 'warning');
-        e.target.value = '';
-        return;
-      }
-
-      const display = document.getElementById('file-name-display');
-      if (display) {
-        display.textContent = `Attached: ${file.name} (${(file.size / 1024).toFixed(0)} KB)`;
-        display.classList.remove('hidden');
-      }
-
-      const reader = new FileReader();
-      reader.onload = ev => {
-        const dataUrl = ev.target.result;
-        const urlInput = document.getElementById('res-url-input');
-        if (urlInput) urlInput.value = dataUrl;
-
-        const titleInput = document.getElementById('res-title-input');
-        if (titleInput && !titleInput.value) {
-          titleInput.value = file.name.replace(/\.[^/.]+$/, "");
-        }
-
-        // Auto set type if image or pdf
-        if (file.type.startsWith('image/')) setResourceType('image');
-        else if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) setResourceType('pdf');
-      };
-      reader.readAsDataURL(file);
-    });
-  }
-
+  // Heading select
   const headingSelect = document.getElementById('heading-select');
   if (headingSelect) {
     headingSelect.addEventListener('change', e => {
@@ -635,28 +709,117 @@ function wireToolbarButtonsOnce() {
     });
   }
 
-  // Type selector buttons
-  modal.querySelectorAll('.type-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      setResourceType(btn.getAttribute('data-type'));
+  // Local file upload
+  const fileInput = document.getElementById('res-file-input');
+  const browseBtn = document.getElementById('btn-browse-file');
+  if (browseBtn && fileInput) {
+    browseBtn.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      if (file.size > 3.5 * 1024 * 1024) {
+        showToast('File size must be under 3.5 MB for database sync', 'warning');
+        e.target.value = '';
+        return;
+      }
+      const display = document.getElementById('file-name-display');
+      if (display) {
+        display.textContent = `Attached: ${file.name} (${(file.size / 1024).toFixed(0)} KB)`;
+        display.classList.remove('hidden');
+      }
+      const reader = new FileReader();
+      reader.onload = ev => {
+        const dataUrl = ev.target.result;
+        const urlInput = document.getElementById('res-url-input');
+        if (urlInput) urlInput.value = dataUrl;
+        const titleInput = document.getElementById('res-title-input');
+        if (titleInput && !titleInput.value) titleInput.value = file.name.replace(/\.[^/.]+$/, '');
+        if (file.type.startsWith('image/')) setResourceType('image');
+        else if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) setResourceType('pdf');
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // ── NEW: Back button ──
+  document.getElementById('hub-back-btn')?.addEventListener('click', () => {
+    const st = userState[activeExam]?.[activeNotesTopicId];
+    if (hubCurrentView === 'reader' || hubCurrentView === 'picker' || hubCurrentView === 'editor') {
+      showHubView('library');
+      renderResourceLibrary(st?.resources || []);
+    } else {
+      closeNotesModal();
+    }
+  });
+
+  // ── NEW: Type picker cards ──
+  modal.querySelectorAll('.hub-type-card').forEach(card => {
+    card.addEventListener('click', () => {
+      currentResType = card.getAttribute('data-type');
+      showResourceEditor(null);
     });
   });
 
-  // Hub Header actions
-  document.getElementById('btn-add-resource')?.addEventListener('click', () => showResourceEditor(null));
+  // ── NEW: Add Resource → show type picker ──
+  document.getElementById('btn-add-resource')?.addEventListener('click', () => showHubView('picker'));
+
+  // ── NEW: Empty state add button ──
+  document.getElementById('hub-empty-add-btn')?.addEventListener('click', () => showHubView('picker'));
+
+  // ── NEW: Search ──
+  const searchInput = document.getElementById('hub-search-input');
+  if (searchInput) {
+    let timer;
+    searchInput.addEventListener('input', e => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        hubSearchQuery = e.target.value.toLowerCase().trim();
+        const st = userState[activeExam]?.[activeNotesTopicId];
+        renderResourceLibrary(st?.resources || []);
+      }, 250);
+    });
+  }
+
+  // ── NEW: Filter pills ──
+  modal.querySelectorAll('.hub-filter-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      modal.querySelectorAll('.hub-filter-pill').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      hubResourceFilter = pill.getAttribute('data-filter');
+      const st = userState[activeExam]?.[activeNotesTopicId];
+      renderResourceLibrary(st?.resources || []);
+    });
+  });
+
+  // ── NEW: Grid / List toggle ──
+  document.getElementById('hub-btn-grid')?.addEventListener('click', () => {
+    hubViewMode = 'grid';
+    document.getElementById('hub-btn-grid')?.classList.add('active');
+    document.getElementById('hub-btn-list')?.classList.remove('active');
+    const st = userState[activeExam]?.[activeNotesTopicId];
+    renderResourceLibrary(st?.resources || []);
+  });
+  document.getElementById('hub-btn-list')?.addEventListener('click', () => {
+    hubViewMode = 'list';
+    document.getElementById('hub-btn-list')?.classList.add('active');
+    document.getElementById('hub-btn-grid')?.classList.remove('active');
+    const st = userState[activeExam]?.[activeNotesTopicId];
+    renderResourceLibrary(st?.resources || []);
+  });
+
+  // Reader controls
   document.getElementById('btn-edit-item')?.addEventListener('click', () => {
     const st = userState[activeExam][activeNotesTopicId];
     const resItem = st?.resources?.find(r => r.id === activeSelectedResId);
     if (resItem) showResourceEditor(resItem);
   });
   document.getElementById('btn-delete-item')?.addEventListener('click', deleteResourceItem);
+
+  // Editor controls
   document.getElementById('btn-cancel-editor')?.addEventListener('click', () => {
     const st = userState[activeExam][activeNotesTopicId];
-    if (st?.resources?.length > 0) {
-      selectResourceItem(activeSelectedResId || st.resources[0].id);
-    } else {
-      closeNotesModal();
-    }
+    showHubView('library');
+    renderResourceLibrary(st?.resources || []);
   });
   document.getElementById('btn-save-resource')?.addEventListener('click', saveResourceItem);
 }
@@ -733,9 +896,9 @@ function initUIEventListeners() {
     renderSubjectBreakdown(this.value);
   });
 
-  // Notes / Study Hub modal close
+  // Notes / Study Hub modal close (X button only — backdrop click does NOT close to avoid
+  // accidental dismissal while a YouTube video is playing)
   document.getElementById('modal-close')?.addEventListener('click', closeNotesModal);
-  document.getElementById('modal-backdrop')?.addEventListener('click', closeNotesModal);
 }
 
 function updateLangButtonUI() {

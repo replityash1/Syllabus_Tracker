@@ -430,7 +430,14 @@ function openNotesModal(topicId, title, selectResId = null) {
 
 function closeNotesModal() {
   activeNotesTopicId = null;
+  // Stop any playing YouTube iframe
   const slate = document.getElementById('clean-slate-body');
-  if (slate) slate.innerHTML = '';
+  if (slate) {
+    slate.querySelectorAll('iframe').forEach(f => { f.src = ''; });
+    slate.innerHTML = '';
+  }
+  // Reset grid
+  const grid = document.getElementById('hub-resource-grid');
+  if (grid) grid.innerHTML = '';
   document.getElementById('notes-modal')?.classList.add('hidden');
 }
