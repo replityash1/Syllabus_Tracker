@@ -1,0 +1,56 @@
+Alright, thinking about this as a student who's actually going to open this app every day for months while prepping — here's how I'd rebuild it.
+
+## The core problem with the current structure
+
+Tracker / Overlap / Analytics as three flat tabs treats this like a data dashboard. But a student opens an app like this for one of three reasons: *"what should I study right now,"* *"let me log what I just did,"* or *"how am I doing overall."* Nothing in the current structure answers the first question — you land straight in a raw syllabus tree and have to figure out where you left off every single time. That's the biggest UX gap, bigger than colors or chart count.
+
+So I'd restructure around **intent, not data type**.
+
+## New navigation: 4 destinations, not 3
+
+**1. Today (new — this becomes the home screen)**
+The first thing you see. Not a syllabus dump.
+- "Continue where you left off" — last subject/topic touched
+- A short suggested list: topics flagged "revise," sorted by how long they've been sitting untouched (this is the single most useful thing analytics currently buries)
+- Today's streak + a simple daily target ("study 5 topics") — optional, dismissible, not preachy
+- One-tap access to search
+
+**2. Syllabus** (the current Tracker, redesigned)
+- Search bar front and center — this doesn't exist right now and it should. A student mid-scroll trying to find "Rajasthan GK → Fairs & Festivals" shouldn't have to hunt through nested cards.
+- Denser subject cards — smaller arc rings, more per row, so the whole syllabus fits in fewer scrolls
+- Topic rows: single compact line, swipe-to-complete / swipe-to-flag-for-revision on mobile, hover-reveal actions on desktop — feels native instead of clicky
+- Overlap folded in here as a **filter toggle** ("Show shared topics") instead of a separate tab — it's the same data, viewed differently, doesn't need its own destination
+
+**3. Revise**
+Pulled out of analytics into its own real view — every topic across every exam currently flagged "revision," sorted by staleness. This is what most tracking apps get wrong: revision flags go in and never come back out anywhere useful. This view is the payoff.
+
+**4. Insights** (trimmed analytics — 5 sections max, not 10)
+- Weekly heatmap + streak (merged)
+- Per-exam progress
+- Subject breakdown
+- Pace / estimated completion date
+- That's it. Everything else was redundant restating of the same three numbers.
+
+## Features I'd actually add
+
+- **Cmd/Ctrl+K search** — jump to any topic instantly, works on desktop and as a search icon on mobile
+- **Focus timer** — simple Pomodoro tied to whatever topic you're viewing, optionally logs minutes against it. Small, not a distraction.
+- **Auto-surfaced weak spots** — topics untouched for 14+ days get quietly flagged, feeds into "Today"
+- **Exam countdown** — if you tell me the dates, a simple number on the home screen. Motivating without being anxiety-bait.
+- **Printable revision sheet** — one-click PDF/print view of pending + flagged topics for offline last-day cramming
+- **Export/Import JSON** — already on your list, and it matters a lot here since guest users have zero backup otherwise
+- **True PWA** — installable, works with a flaky connection, since most students will be checking this on mobile data between classes
+
+## What I'd cut
+
+- Context bar (redundant, already flagged)
+- The 4 analytics sections that just restate the same 3 numbers differently
+- The resource-explorer duplicate bug — replace with the simple summary version, and honestly the full explorer probably belongs *inside* the Syllabus view next to each topic, not analytics at all
+
+## Visual direction
+
+Agree with dropping the indigo/emerald/amber combo — it's the default look of every AI-built dashboard. I'd go for something with more identity: fewer, richer accent colors per exam, generous whitespace, and interaction over decoration — micro-animations on completing a topic, a real (not gimmicky) milestone moment at 100% on a subject, rather than charts for the sake of charts.
+
+---
+
+If this direction feels right, I'd start with the audit + bug fixes from those Claude reports first (the XSS gaps and duplicate function are real problems worth fixing regardless of redesign), then move to restructuring `index.html`/`ui.js` around these four views. Want me to start there — and if so, can you upload the actual repo files so I'm working against the real code instead of the summary?
