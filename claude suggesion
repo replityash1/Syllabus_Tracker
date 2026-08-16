@@ -54,3 +54,139 @@ Agree with dropping the indigo/emerald/amber combo — it's the default look of 
 ---
 
 If this direction feels right, I'd start with the audit + bug fixes from those Claude reports first (the XSS gaps and duplicate function are real problems worth fixing regardless of redesign), then move to restructuring `index.html`/`ui.js` around these four views. Want me to start there — and if so, can you upload the actual repo files so I'm working against the real code instead of the summary?
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Let me actually start over — not patch the three-tab model, but ask what this product is *for* and design outward from that.
+
+## First principles
+
+A syllabus tracker's real competitor isn't another app — it's a **notebook with a hand-drawn checklist** or a screenshot of the syllabus with items crossed off in Notes app. Those win because they answer "what's left" instantly, cost zero taps to update, and never make the student think about the tool. Every feature I add has to earn its place against that bar. So the design principle is: **minimize the distance between "I finished something" and "it's logged,"** and **minimize the distance between "I opened the app" and "I know what to do."** Everything else is secondary.
+
+Second principle: this is a *long relationship* tool — months of daily use, often under stress, often at 11pm on a phone with 20% battery. So it needs to be calm, fast, and forgiving, not gamified-loud or data-heavy.
+
+---
+
+## Information architecture — rebuilt around 3 questions, not 3 data types
+
+A student opens this app to answer exactly one of:
+1. "What do I study right now?"
+2. "Let me mark what I just did."
+3. "How am I actually doing / am I on pace?"
+
+So instead of Tracker / Overlap / Analytics, I'd build:
+
+**Home** → answers Q1
+**Study** (syllabus tree, search, marking) → answers Q2, and Q1 for self-directed sessions
+**Progress** → answers Q3
+
+Three destinations, not four — I'm folding "Revise" into Home rather than making it a separate tab, because a separate tab is one more place to check, and revision items are exactly what belongs on a landing screen, not tucked away.
+
+A persistent bottom bar (mobile) / left rail (desktop) with exactly these 3 + a search trigger. That's it. No hamburger menu hiding features — if a feature needs a hamburger menu, it's probably not important enough to keep.
+
+---
+
+## Home — the actual redesign centerpiece
+
+This is the screen that doesn't exist today and matters most. Structure, top to bottom:
+
+**1. Greeting strip** — time-aware, minimal ("Tuesday, 11 topics to go this week" style — actual data, not fake cheer).
+
+**2. Continue card** — one large card: last topic touched, which exam, a one-tap "mark complete" and "open" action right there. No navigation needed to close the loop on what you were just doing.
+
+**3. Due for revision** — a horizontally scrollable strip (mobile) / grid (desktop) of topics flagged for revision, **sorted by staleness** (days since last touched), capped at showing ~6 with a "see all" that goes to a filtered Study view. This is the single highest-value feature the current app doesn't have — flags go in and are never surfaced again.
+
+**4. Today's focus (optional, dismissible)** — a lightweight target like "study 5 topics" or "30 minutes." Not a hard gamification system, just a soft target you can turn off in one tap. Students who like structure get it; students who find it patronizing kill it once and it stays off.
+
+**5. Quiet stats row** — 3 numbers max: overall %, current streak, days to exam (if set). No charts on Home — charts belong in Progress.
+
+**6. Empty state for new users** — instead of a blank tracker, Home for a brand-new account should say something like "Pick your exam and let's set up your first study session" with a single CTA — not silence.
+
+---
+
+## Study — syllabus view, rebuilt for speed
+
+- **Search-first.** A real search bar at the top, not buried. Type "fairs" → jump straight to the matching topic under whatever subject, syllabus tree auto-expands to it. This alone removes 80% of scroll-hunting.
+- **Command palette (Cmd/Ctrl+K on desktop, search icon on mobile)** — jump to any subject/topic, switch exams, or trigger actions like "export data" from one input. Feels fast, feels modern, costs nothing to build in vanilla JS.
+- **Collapsed-by-default subject cards** with a compact progress ring — expand on tap. Currently (per the audit) everything seems to render open and heavy; collapsing by default means the whole syllabus fits above the fold in overview form.
+- **Topic rows as single compact lines** — icon-based status (not walls of buttons): a tap cycles not-started → done, a long-press or swipe opens revision/bookmark/notes options. On desktop, hover reveals the same actions inline. This removes visual clutter from the biggest, most-used view in the app.
+- **Overlap becomes a filter chip**, not a separate tab: "Shared with [other exam]" toggle at the top of Study. It's the same syllabus data, just filtered — treating it as a whole separate view (as it is now) fragments a workflow that's actually one continuous task: going through your syllabus.
+- **Bulk actions** — long-press a subject header → "mark all topics I've covered up to here" for students migrating from a paper tracker. This is a real onboarding accelerator that doesn't exist today.
+
+---
+
+## Progress — trimmed hard, kept honest
+
+Cut down from ten sections to five, each one answering a distinct question instead of restating the same completion percentage in six visual forms:
+
+1. **Pace** — completion % vs. days-to-exam if set, phrased as "at this rate you'll finish by [date]" — this is the number students actually care about, not raw %.
+2. **Streak + activity heatmap** (merged, as the audit already suggested — correct call).
+3. **Per-exam breakdown** — simple horizontal bars, not competing arc rings across three colors fighting for attention.
+4. **Subject weak spots** — which subjects have the most stale/never-touched topics — directly actionable, feeds back into Home's revision strip.
+5. **Notes & bookmarks library** — the resource-explorer grid from the duplicated function belongs *here*, not buried mid-analytics, since it's a browsing feature, not a stat.
+
+No sparkline-plus-bar-chart-plus-radial-plus-heatmap redundancy. If two visualizations show the same underlying number, one of them goes.
+
+---
+
+## Features I'd genuinely add (beyond what I mentioned before), and why each earns its place
+
+- **Undo toast** — every destructive/state-changing action (mark complete, delete note, clear revision flag) gets a 5-second "Undone" toast with an undo button. Costs little, removes a huge class of "oh no I misclicked" anxiety in a tool used for months.
+- **Keyboard shortcuts on desktop** — `/` to search, `j/k` to move through topic list, `space` to toggle complete. Power users studying at a desk for hours will genuinely use this.
+- **Session-based time tracking (optional, local-only)** — a simple start/stop timer per subject, stored locally, feeding the "pace" estimate with real hours instead of just topic counts. Not forced — a student who doesn't want to track time never sees it get in the way.
+- **Local reminders via the Notification API** — "You haven't touched Polity in 9 days" — opt-in, no backend needed, works fine as a static PWA.
+- **Print/export a clean revision sheet** — one click to a printable page of just pending + flagged topics, for offline last-week cramming when data/battery is unreliable — genuinely how a lot of exam prep happens in the final days.
+- **Data export/import as JSON** — already agreed, but I'd make it prominent (in Home settings, not buried), since guest/localStorage users have literally no backup otherwise and losing months of tracked progress is a real, high-stakes failure mode for this app specifically.
+- **Conflict-safe sync indicator** — a small, honest "synced" / "saving…" / "offline — will sync" indicator near the profile icon, so students on patchy hostel wifi aren't left wondering if their progress is actually saved. Trust in the data is the whole product.
+
+## What I'd deliberately not build
+
+- No badges/points/leaderboards — exam prep stress doesn't need gamified competition layered on top.
+- No social/sharing features — adds backend complexity this static-site + Firebase architecture isn't suited for, and isn't why students use this.
+- No AI-generated study plans or chatbot — out of scope, adds fragility and cost for a tool whose value is being simple and fast.
+- No forced daily streak guilt-tripping — streak is shown, never punished.
+
+---
+
+## Visual & interaction system, more specifically
+
+- Distinct exam-accent colors, but used **sparingly** — as thin left-borders and small icons, not full card backgrounds, so the UI doesn't look like a color-coded mess when all three exams are visible at once.
+- Motion used only for state confirmation (a checkbox settling, a card collapsing) — never decorative animation that delays getting to content.
+- One real "moment" reserved for completing an entire subject (100%) — a brief, tasteful animation — because that's a genuine milestone worth marking, versus overusing celebration on every small tick.
+- Typography carries most of the visual identity: a confident large numeral style for stats, restrained body text elsewhere — letting content density read as "serious study tool," not "consumer app."
+
+---
+
+This is a full rethink of the shape of the product, not a skin change. The underlying architecture you already have (vanilla JS, modular CSS/JS, dual localStorage/Firestore, JSON syllabus data) supports all of this without new frameworks or a bundler — it's a restructuring of `index.html`'s views and the JS modules around them, not a rewrite.
+
+Before I turn this into actual implementation, I'd want the real repo files — I've been reasoning from the two audit summaries, and I don't want to write code against assumptions about your DOM structure or state shape. Want to upload the project so I can start from Home + Study first?
